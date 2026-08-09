@@ -87,31 +87,29 @@ jobs:
           make -j"$(sysctl -n hw.ncpu)"
 
       - name: Package Binaries
+        # IFW 源码自带 dist/（README、config 等），勿往那里拷贝。
         run: |
-          mkdir -p dist
+          OUT="${GITHUB_WORKSPACE}/ifw-out"
+          rm -rf "${OUT}"
+          mkdir -p "${OUT}"
           for tool in binarycreator repogen archivegen devtool; do
             src="build/bin/${tool}"
             test -x "${src}"
-            cp "${src}" dist/
-            strip -x "dist/${tool}"
-          done
-          lipo -info dist/* || true
-          file dist/*
-          # 验收：不应再依赖 Qt frameworks / libQt6*.dylib
-          failed=0
-          for tool in dist/*; do
-            echo "=== otool -L ${tool} ==="
-            otool -L "${tool}"
-            if otool -L "${tool}" | grep -E 'Qt[^ ]*\.framework|libQt6[^ ]*\.dylib'; then
+            cp "${src}" "${OUT}/"
+            strip -x "${OUT}/${tool}"
+            echo "=== ${tool} ==="
+            lipo -info "${OUT}/${tool}" || true
+            file "${OUT}/${tool}"
+            otool -L "${OUT}/${tool}"
+            if otool -L "${OUT}/${tool}" | grep -E 'Qt[^ ]*\.framework|libQt6[^ ]*\.dylib'; then
               echo "::error::${tool} still links Qt dynamically"
-              failed=1
+              exit 1
             fi
           done
-          exit "${failed}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: qtifw-4.11.0-macos-arm64
-          path: dist/
+          path: ifw-out/
           if-no-files-found: error
