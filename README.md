@@ -13,7 +13,7 @@ git push origin v4.11.0-1
 
 结束后在 **Releases** 下载 `qtifw-4.11.0-macos-arm64.zip`（同时保留 Actions artifact：`qtifw-4.11.0-macos-arm64`）。
 
-产物包含：`binarycreator`、`repogen`、`archivegen`、`devtool`（已 `strip`）。
+产物包含：`binarycreator`、`repogen`、`archivegen`、`devtool`、`installerbase`（已 `strip`）。
 
 ## 构建说明
 
