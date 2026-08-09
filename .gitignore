@@ -3,6 +3,8 @@
 /dist/
 /Qt/
 /qt_static/
+/qt5compat-src/
+/qt5compat-build/
 /.venv/
 *.zip
 

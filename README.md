@@ -5,7 +5,7 @@
 ## 用法
 
 1. 打开仓库 **Actions** → **Build QtIFW 4.11.0 (macOS arm64)**
-2. 点击 **Run workflow**
+2. 点击 **Run workflow**（或 push / PR 到 `main`）
 3. 结束后下载 artifact：`qtifw-4.11.0-macos-arm64`
 
 产物包含：`binarycreator`、`repogen`、`archivegen`、`devtool`（已 `strip`）。
@@ -16,22 +16,28 @@
 | --- | --- |
 | 源码 | `qtproject/installer-framework` @ `4.11.0` |
 | Runner | `macos-14`（arm64） |
-| Qt | 6.8.0 desktop（aqt / `clang_64`） |
-| 模块 | `qt5compat`（`qttools` 不是 aqt module） |
+| Qt | **static** 6.8.3（[`AllanChain/install-qt-static@v6.8.3-1`](https://github.com/AllanChain/install-qt-static)） |
+| 补编模块 | `qt5compat`（预编译包不含，源码补装进同一 prefix） |
 | 构建系统 | **qmake** + `make`（4.11 无 CMake） |
-| 依赖 | Homebrew `xz`（liblzma，供 libarchive） |
+| 依赖 | Homebrew `xz` / `p7zip` / `ninja`；`IFW_LZMA_LIBRARY` 指向静态 `liblzma.a` |
 
-官方文档要求：若要打出「单文件、几乎不依赖外部 Qt」的安装包，需用 **static Qt** 再编 IFW。当前 workflow 使用官方动态库 Qt，工具本身可运行，但会依赖同版本 Qt frameworks。
+按官方 INSTALL：用 static Qt 编 IFW，工具与其打出的安装包可避免依赖外部 Qt frameworks。打包步骤会用 `otool -L` 检查产物不链 `Qt*.framework` / `libQt6*.dylib`。
+
+## 已知限制
+
+- 预编译 Qt 使用 `-no-feature-accessibility` / `-optimize-size`，与 IFW INSTALL 推荐配置不完全一致；若编译缺 accessibility API，需换 tag 或自建 static Qt。
+- 产物仍可能依赖系统或 Homebrew 的非 Qt 库（如 iconv）；目标是去掉 **Qt** 动态依赖。
+- 预编译包为 universal（x86_64+arm64）；本 workflow 以 `QMAKE_APPLE_DEVICE_ARCHS=arm64` 只产出 arm64 IFW 工具。
 
 ## 相对草稿的修正
 
 原稿不能直接跑通，主要差异：
 
 1. **不要用 CMake / `-DIFW_STATIC=ON`**：4.11.0 根目录只有 `installerfw.pro`，Coin CI 也是 `qmake` + `make`。
-2. **aqt arch 是 `clang_64`**，不是 `macos_arm64`。
-3. **模块名是 `qt5compat` / `qttools`**，不是 `qtshade`。
-4. **需要 `brew install xz`**，否则 libarchive 相关链接可能失败。
-5. **Release 产物对二进制做 `strip`**，避免交付物泄漏大量符号。
+2. **用预编译 static Qt**，不用 aqt 动态桌面包。
+3. **补编 `qt5compat`** 进 static prefix（上游包未包含）。
+4. **需要 `brew install xz`**，并以 `IFW_LZMA_LIBRARY` 链静态 `liblzma.a`。
+5. **Release 产物对二进制做 `strip`**，并用 `otool` 验收无 Qt dylib。
 
 ## 许可证
 

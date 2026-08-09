@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,9 +13,7 @@ jobs:
 
     env:
       IFW_REF: "4.11.0"
-      QT_VERSION: "6.8.0"
-      # aqt 在 mac desktop 上的 arch 名是 clang_64（非 macos_arm64）
-      QT_ARCH: "clang_64"
+      QT_VERSION: "6.8.3"
 
     steps:
       - name: Checkout QtIFW Source
@@ -25,43 +24,48 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          brew install ninja xz
-          # macOS runner Python 受 PEP 668 保护，不能直接 pip --user
-          python3 -m venv "${GITHUB_WORKSPACE}/.venv"
-          "${GITHUB_WORKSPACE}/.venv/bin/pip" install --upgrade pip aqtinstall
-          echo "${GITHUB_WORKSPACE}/.venv/bin" >> "$GITHUB_PATH"
+          brew install ninja xz p7zip
 
-      - name: Install Qt 6 (desktop)
-        # 使用官方动态库版 Qt 编译工具链。
-        # 若要让 binarycreator 打出几乎不依赖外部 Qt dylib 的安装包，
-        # 需要自行构建 static Qt，或改用第三方 static Qt 产物。
-        # IFW 4.11 需要 Qt5Compat。qttools 不是 aqt module（会报 packages not found）。
-        # 必须用 -O，否则 aqt 会装到 $PWD/<ver>/macos，而不是 Qt/<ver>/macos。
+      - name: Install Static Qt
+        # 预编译 static Qt（universal）；解压到 ./qt_static 并把 bin 加入 PATH。
+        # 包内无 qt5compat，下一步单独补编。
+        uses: AllanChain/install-qt-static@v6.8.3-1
+
+      - name: Build qt5compat into static prefix
         run: |
-          aqt install-qt mac desktop "${QT_VERSION}" "${QT_ARCH}" \
-            -O "${GITHUB_WORKSPACE}/Qt" \
-            -m qt5compat
-          QTDIR="${GITHUB_WORKSPACE}/Qt/${QT_VERSION}/macos"
+          QTDIR="${GITHUB_WORKSPACE}/qt_static"
           test -x "${QTDIR}/bin/qmake"
+          test -x "${QTDIR}/bin/qt-cmake"
+          git clone --depth 1 -b "${QT_VERSION}" \
+            https://github.com/qt/qt5compat.git "${GITHUB_WORKSPACE}/qt5compat-src"
+          "${QTDIR}/bin/qt-cmake" \
+            -S "${GITHUB_WORKSPACE}/qt5compat-src" \
+            -B "${GITHUB_WORKSPACE}/qt5compat-build" \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${QTDIR}"
+          cmake --build "${GITHUB_WORKSPACE}/qt5compat-build" --parallel
+          cmake --install "${GITHUB_WORKSPACE}/qt5compat-build"
+          test -d "${QTDIR}/lib/cmake/Qt6Core5Compat"
           echo "QTDIR=${QTDIR}" >> "$GITHUB_ENV"
-          echo "${QTDIR}/bin" >> "$GITHUB_PATH"
-          # 默认包通常已含 lrelease；若无则跳过 IFW 翻译
           if [[ ! -x "${QTDIR}/bin/lrelease" ]]; then
             echo "IFW_DISABLE_TRANSLATIONS=1" >> "$GITHUB_ENV"
           fi
 
       - name: Build QtIFW
-        # 4.11 官方构建系统是 qmake（无 CMakeLists / 无 IFW_STATIC）。
-        # 静态/动态链接跟随所用 Qt；见 INSTALL 文档。
-        # Homebrew xz 在 /opt/homebrew，默认不在 Xcode clang 搜索路径里。
+        # 4.11 官方构建系统是 qmake；静态/动态跟随所用 Qt。
+        # Coin 在 macOS 上用静态 liblzma；Homebrew 头文件需显式传入。
         run: |
           BREW_PREFIX="$(brew --prefix)"
           XZ_PREFIX="$(brew --prefix xz)"
+          LZMA_A="${XZ_PREFIX}/lib/liblzma.a"
+          test -f "${LZMA_A}"
           mkdir -p build
           cd build
           "${QTDIR}/bin/qmake" \
             "QMAKE_APPLE_DEVICE_ARCHS=arm64" \
             "CONFIG+=release" \
+            "IFW_LZMA_LIBRARY=${LZMA_A}" \
             "INCLUDEPATH+=${XZ_PREFIX}/include" \
             "INCLUDEPATH+=${BREW_PREFIX}/include" \
             "LIBS+=-L${XZ_PREFIX}/lib" \
@@ -80,8 +84,17 @@ jobs:
           done
           lipo -info dist/* || true
           file dist/*
-          # 动态 Qt 下工具仍依赖 Qt frameworks；本产物适合本机已装同版 Qt，
-          # 或后续改用 static Qt 再打交付包。
+          # 验收：不应再依赖 Qt frameworks / libQt6*.dylib
+          failed=0
+          for tool in dist/*; do
+            echo "=== otool -L ${tool} ==="
+            otool -L "${tool}"
+            if otool -L "${tool}" | grep -E 'Qt[^ ]*\.framework|libQt6[^ ]*\.dylib'; then
+              echo "::error::${tool} still links Qt dynamically"
+              failed=1
+            fi
+          done
+          exit "${failed}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
