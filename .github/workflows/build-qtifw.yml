@@ -53,12 +53,19 @@ jobs:
       - name: Build QtIFW
         # 4.11 官方构建系统是 qmake（无 CMakeLists / 无 IFW_STATIC）。
         # 静态/动态链接跟随所用 Qt；见 INSTALL 文档。
+        # Homebrew xz 在 /opt/homebrew，默认不在 Xcode clang 搜索路径里。
         run: |
+          BREW_PREFIX="$(brew --prefix)"
+          XZ_PREFIX="$(brew --prefix xz)"
           mkdir -p build
           cd build
           "${QTDIR}/bin/qmake" \
             "QMAKE_APPLE_DEVICE_ARCHS=arm64" \
             "CONFIG+=release" \
+            "INCLUDEPATH+=${XZ_PREFIX}/include" \
+            "INCLUDEPATH+=${BREW_PREFIX}/include" \
+            "LIBS+=-L${XZ_PREFIX}/lib" \
+            "LIBS+=-L${BREW_PREFIX}/lib" \
             ..
           make -j"$(sysctl -n hw.ncpu)"
 
