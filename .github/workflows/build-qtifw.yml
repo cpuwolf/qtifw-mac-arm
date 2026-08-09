@@ -2,10 +2,11 @@ name: Build QtIFW 4.11.0 (macOS arm64)
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -14,6 +15,7 @@ jobs:
     env:
       IFW_REF: "4.11.0"
       QT_VERSION: "6.8.3"
+      RELEASE_ASSET: "qtifw-4.11.0-macos-arm64.zip"
 
     steps:
       - name: Checkout QtIFW Source
@@ -106,10 +108,25 @@ jobs:
               exit 1
             fi
           done
+          (
+            cd "${OUT}"
+            zip -9 "${GITHUB_WORKSPACE}/${RELEASE_ASSET}" \
+              binarycreator repogen archivegen devtool
+          )
+          ls -lh "${GITHUB_WORKSPACE}/${RELEASE_ASSET}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: qtifw-4.11.0-macos-arm64
-          path: ifw-out/
+          path: |
+            ifw-out/
+            ${{ env.RELEASE_ASSET }}
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.RELEASE_ASSET }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true

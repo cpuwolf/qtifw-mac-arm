@@ -4,9 +4,14 @@
 
 ## 用法
 
-1. 打开仓库 **Actions** → **Build QtIFW 4.11.0 (macOS arm64)**
-2. 点击 **Run workflow**（或 push / PR 到 `main`）
-3. 结束后下载 artifact：`qtifw-4.11.0-macos-arm64`
+打 `v*` tag 并 push 后自动构建，并发布到 GitHub Release：
+
+```bash
+git tag v4.11.0-1
+git push origin v4.11.0-1
+```
+
+结束后在 **Releases** 下载 `qtifw-4.11.0-macos-arm64.zip`（同时保留 Actions artifact：`qtifw-4.11.0-macos-arm64`）。
 
 产物包含：`binarycreator`、`repogen`、`archivegen`、`devtool`（已 `strip`）。
 
