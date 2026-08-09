@@ -17,7 +17,7 @@
 | 源码 | `qtproject/installer-framework` @ `4.11.0` |
 | Runner | `macos-14`（arm64） |
 | Qt | 6.8.0 desktop（aqt / `clang_64`） |
-| 模块 | `qt5compat`、`qttools` |
+| 模块 | `qt5compat`（`qttools` 不是 aqt module） |
 | 构建系统 | **qmake** + `make`（4.11 无 CMake） |
 | 依赖 | Homebrew `xz`（liblzma，供 libarchive） |
 
