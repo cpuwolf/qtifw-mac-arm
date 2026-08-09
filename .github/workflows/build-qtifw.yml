@@ -1,0 +1,71 @@
+name: Build QtIFW 4.11.0 (macOS arm64)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    env:
+      IFW_REF: "4.11.0"
+      QT_VERSION: "6.8.0"
+      # aqt 在 mac desktop 上的 arch 名是 clang_64（非 macos_arm64）
+      QT_ARCH: "clang_64"
+
+    steps:
+      - name: Checkout QtIFW Source
+        uses: actions/checkout@v4
+        with:
+          repository: qtproject/installer-framework
+          ref: ${{ env.IFW_REF }}
+
+      - name: Install Dependencies
+        run: |
+          brew install ninja xz
+          python3 -m pip install --user aqtinstall
+          echo "$HOME/Library/Python/$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/bin" >> "$GITHUB_PATH"
+
+      - name: Install Qt 6 (desktop)
+        # 使用官方动态库版 Qt 编译工具链。
+        # 若要让 binarycreator 打出几乎不依赖外部 Qt dylib 的安装包，
+        # 需要自行构建 static Qt，或改用第三方 static Qt 产物。
+        # IFW 4.11 需要 Qt5Compat；构建翻译还会用到 qttools 里的 lrelease。
+        run: |
+          aqt install-qt mac desktop "${QT_VERSION}" "${QT_ARCH}" \
+            -m qt5compat qttools
+          echo "QTDIR=${GITHUB_WORKSPACE}/Qt/${QT_VERSION}/macos" >> "$GITHUB_ENV"
+          echo "${GITHUB_WORKSPACE}/Qt/${QT_VERSION}/macos/bin" >> "$GITHUB_PATH"
+
+      - name: Build QtIFW
+        # 4.11 官方构建系统是 qmake（无 CMakeLists / 无 IFW_STATIC）。
+        # 静态/动态链接跟随所用 Qt；见 INSTALL 文档。
+        run: |
+          mkdir -p build
+          cd build
+          qmake \
+            "QMAKE_APPLE_DEVICE_ARCHS=arm64" \
+            "CONFIG+=release" \
+            ..
+          make -j"$(sysctl -n hw.ncpu)"
+
+      - name: Package Binaries
+        run: |
+          mkdir -p dist
+          for tool in binarycreator repogen archivegen devtool; do
+            src="build/bin/${tool}"
+            test -x "${src}"
+            cp "${src}" dist/
+            strip -x "dist/${tool}"
+          done
+          lipo -info dist/* || true
+          file dist/*
+          # 动态 Qt 下工具仍依赖 Qt frameworks；本产物适合本机已装同版 Qt，
+          # 或后续改用 static Qt 再打交付包。
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qtifw-4.11.0-macos-arm64
+          path: dist/
+          if-no-files-found: error

@@ -1,0 +1,13 @@
+# Local build / Qt installs
+/build/
+/dist/
+/Qt/
+/qt_static/
+*.zip
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.user
+*.pro.user
