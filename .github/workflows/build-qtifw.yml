@@ -23,8 +23,10 @@ jobs:
       - name: Install Dependencies
         run: |
           brew install ninja xz
-          python3 -m pip install --user aqtinstall
-          echo "$HOME/Library/Python/$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/bin" >> "$GITHUB_PATH"
+          # macOS runner Python 受 PEP 668 保护，不能直接 pip --user
+          python3 -m venv "${GITHUB_WORKSPACE}/.venv"
+          "${GITHUB_WORKSPACE}/.venv/bin/pip" install --upgrade pip aqtinstall
+          echo "${GITHUB_WORKSPACE}/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Install Qt 6 (desktop)
         # 使用官方动态库版 Qt 编译工具链。

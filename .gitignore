@@ -3,6 +3,7 @@
 /dist/
 /Qt/
 /qt_static/
+/.venv/
 *.zip
 
 # IDE / OS
