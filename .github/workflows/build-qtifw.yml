@@ -36,9 +36,13 @@ jobs:
         # 若要让 binarycreator 打出几乎不依赖外部 Qt dylib 的安装包，
         # 需要自行构建 static Qt，或改用第三方 static Qt 产物。
         # IFW 4.11 需要 Qt5Compat。qttools 不是 aqt module（会报 packages not found）。
+        # 必须用 -O，否则 aqt 会装到 $PWD/<ver>/macos，而不是 Qt/<ver>/macos。
         run: |
-          aqt install-qt mac desktop "${QT_VERSION}" "${QT_ARCH}" -m qt5compat
+          aqt install-qt mac desktop "${QT_VERSION}" "${QT_ARCH}" \
+            -O "${GITHUB_WORKSPACE}/Qt" \
+            -m qt5compat
           QTDIR="${GITHUB_WORKSPACE}/Qt/${QT_VERSION}/macos"
+          test -x "${QTDIR}/bin/qmake"
           echo "QTDIR=${QTDIR}" >> "$GITHUB_ENV"
           echo "${QTDIR}/bin" >> "$GITHUB_PATH"
           # 默认包通常已含 lrelease；若无则跳过 IFW 翻译
@@ -52,7 +56,7 @@ jobs:
         run: |
           mkdir -p build
           cd build
-          qmake \
+          "${QTDIR}/bin/qmake" \
             "QMAKE_APPLE_DEVICE_ARCHS=arm64" \
             "CONFIG+=release" \
             ..
