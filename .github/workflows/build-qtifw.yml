@@ -80,6 +80,7 @@ jobs:
             -spec macx-clang \
             "QMAKE_APPLE_DEVICE_ARCHS=arm64" \
             "CONFIG+=release" \
+            "QMAKE_LFLAGS+=-Wl,-no_adhoc_codesign" \
             "IFW_LZMA_LIBRARY=${LZMA_A}" \
             "INCLUDEPATH+=${XZ_PREFIX}/include" \
             "INCLUDEPATH+=${BREW_PREFIX}/include" \
@@ -99,6 +100,9 @@ jobs:
             test -x "${src}"
             cp "${src}" "${OUT}/"
             strip -x "${OUT}/${tool}"
+            # 去掉 ld 默认的 adhoc / linker-signed，便于后续用 Developer ID 重签
+            codesign --remove-signature "${OUT}/${tool}" 2>/dev/null || true
+            codesign --remove-signature --force "${OUT}/${tool}" 2>/dev/null || true
             echo "=== ${tool} ==="
             lipo -info "${OUT}/${tool}" || true
             file "${OUT}/${tool}"
@@ -107,6 +111,12 @@ jobs:
               echo "::error::${tool} still links Qt dynamically"
               exit 1
             fi
+            if codesign -dv "${OUT}/${tool}" 2>&1 | grep -qiE 'Signature=adhoc|linker-signed|Authority='; then
+              echo "::error::${tool} still has a code signature"
+              codesign -dv --verbose=4 "${OUT}/${tool}" 2>&1 || true
+              exit 1
+            fi
+            codesign -dv --verbose=4 "${OUT}/${tool}" 2>&1 || true
           done
           (
             cd "${OUT}"

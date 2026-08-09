@@ -13,7 +13,7 @@ git push origin v4.11.0-1
 
 结束后在 **Releases** 下载 `qtifw-4.11.0-macos-arm64.zip`（同时保留 Actions artifact：`qtifw-4.11.0-macos-arm64`）。
 
-产物包含：`binarycreator`、`repogen`、`archivegen`、`devtool`、`installerbase`（已 `strip`）。
+产物包含：`binarycreator`、`repogen`、`archivegen`、`devtool`、`installerbase`（已 `strip`，并去掉 adhoc / linker-signed）。
 
 ## 构建说明
 
@@ -44,6 +44,7 @@ git push origin v4.11.0-1
 3. **补编 `qt5compat`** 进 static prefix（上游包未包含）。
 4. **需要 `brew install xz`**，并以 `IFW_LZMA_LIBRARY` 链静态 `liblzma.a`。
 5. **Release 产物对二进制做 `strip`**，并用 `otool` 验收无 Qt dylib。
+6. **去掉 macOS adhoc / linker-signed**（`QMAKE_LFLAGS+=-Wl,-no_adhoc_codesign` + `codesign --remove-signature`），便于交付后用 Developer ID 重签。
 
 ## 许可证
 
