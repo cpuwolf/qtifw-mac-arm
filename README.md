@@ -26,6 +26,7 @@
 ## 已知限制
 
 - 预编译 Qt 使用 `-no-feature-accessibility` / `-optimize-size`，与 IFW INSTALL 推荐配置不完全一致；若编译缺 accessibility API，需换 tag 或自建 static Qt。
+- 解压后需写 `qt_static/bin/qt.conf`（`Prefix = ..`），否则 `qmake` 找不到 `macx-clang`。
 - 产物仍可能依赖系统或 Homebrew 的非 Qt 库（如 iconv）；目标是去掉 **Qt** 动态依赖。
 - 预编译包为 universal（x86_64+arm64）；本 workflow 以 `QMAKE_APPLE_DEVICE_ARCHS=arm64` 只产出 arm64 IFW 工具。
 

@@ -31,9 +31,22 @@ jobs:
         # 包内无 qt5compat，下一步单独补编。
         uses: AllanChain/install-qt-static@v6.8.3-1
 
-      - name: Build qt5compat into static prefix
+      - name: Fix relocatable qmake paths
+        # zip 解压后 qmake 仍可能指向原构建 prefix，导致找不到 macx-clang。
         run: |
           QTDIR="${GITHUB_WORKSPACE}/qt_static"
+          test -x "${QTDIR}/bin/qmake"
+          test -d "${QTDIR}/mkspecs/macx-clang"
+          printf '%s\n' '[Paths]' 'Prefix = ..' > "${QTDIR}/bin/qt.conf"
+          echo "=== qmake -query ==="
+          "${QTDIR}/bin/qmake" -query
+          PREFIX="$("${QTDIR}/bin/qmake" -query QT_INSTALL_PREFIX)"
+          test "${PREFIX}" = "${QTDIR}"
+          test -d "${PREFIX}/mkspecs/macx-clang"
+          echo "QTDIR=${QTDIR}" >> "$GITHUB_ENV"
+
+      - name: Build qt5compat into static prefix
+        run: |
           test -x "${QTDIR}/bin/qmake"
           test -x "${QTDIR}/bin/qt-cmake"
           git clone --depth 1 -b "${QT_VERSION}" \
@@ -47,7 +60,6 @@ jobs:
           cmake --build "${GITHUB_WORKSPACE}/qt5compat-build" --parallel
           cmake --install "${GITHUB_WORKSPACE}/qt5compat-build"
           test -d "${QTDIR}/lib/cmake/Qt6Core5Compat"
-          echo "QTDIR=${QTDIR}" >> "$GITHUB_ENV"
           if [[ ! -x "${QTDIR}/bin/lrelease" ]]; then
             echo "IFW_DISABLE_TRANSLATIONS=1" >> "$GITHUB_ENV"
           fi
@@ -63,6 +75,7 @@ jobs:
           mkdir -p build
           cd build
           "${QTDIR}/bin/qmake" \
+            -spec macx-clang \
             "QMAKE_APPLE_DEVICE_ARCHS=arm64" \
             "CONFIG+=release" \
             "IFW_LZMA_LIBRARY=${LZMA_A}" \
